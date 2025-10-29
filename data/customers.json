@@ -1,0 +1,23 @@
+[
+  {
+    "customer_id": "C001",
+    "name": "ABC Corporation",
+    "email": "contact@abc.com",
+    "phone": "02-1234-5678",
+    "plan": "Enterprise",
+    "status": "active",
+    "created_at": "2024-01-15T00:00:00",
+    "notes": "주요 고객 - 월 계약금액 높음"
+  },
+  {
+    "customer_id": "C002",
+    "name": "XYZ Startup",
+    "email": "help@xyz.com",
+    "phone": "02-9876-5432",
+    "plan": "Pro",
+    "status": "active",
+    "created_at": "2024-03-20T00:00:00",
+    "notes": "신규 고객 - 빠른 성장 중"
+  }
+]
+

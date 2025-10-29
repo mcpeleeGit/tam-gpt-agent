@@ -1,0 +1,11 @@
+[
+  {
+    "title": "앱 관리자 설정 오류 (KOE009)",
+    "description": "앱 ID: 1327236, 에러 코드: KOE009\n\n에러 메시지: 웹 플랫폼 설정 오류: 관리자 설정이 올바르지 않습니다.\n발생 시간: 2024-10-26T10:30:00",
+    "priority": "high",
+    "customer_id": null,
+    "ticket_id": "TKT-0001",
+    "created_at": "2025-10-26T15:52:00.381552",
+    "status": "open"
+  }
+]
