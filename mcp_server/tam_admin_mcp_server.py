@@ -23,7 +23,7 @@ app = Flask(__name__)
 # 환경 설정
 TAM_ADMIN_API_BASE_URL = os.getenv('TAM_ADMIN_API_BASE_URL', '')
 TAM_ADMIN_API_HOST = os.getenv('TAM_ADMIN_API_HOST', '')
-TAM_ADMIN_API_AUTH = 'Basic'
+TAM_ADMIN_API_AUTH = os.getenv('TAM_ADMIN_API_AUTH', '')
 TAM_ADMIN_API_UA = 'tam-batch'
 TAM_ADMIN_CLIENT = 'TAM-AGENT'
 
