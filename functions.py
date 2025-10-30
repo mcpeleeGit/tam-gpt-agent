@@ -138,14 +138,10 @@ FUNCTION_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "send_kakao_message",
-            "description": "카카오톡 메시지 발송 - 자기 자신에게 메시지 보내기 (기본 동작), 또는 특정 수신자에게 보내기",
+            "description": "카카오톡 메시지 발송 - 자기 자신에게 메시지 보내기",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "receiver_id": {
-                        "type": "string",
-                        "description": "수신자 ID (선택사항, 자기 자신에게 보낼 때는 생략 가능)"
-                    },
                     "message": {
                         "type": "string",
                         "description": "발송할 메시지 내용 (필수)"
@@ -153,6 +149,18 @@ FUNCTION_DEFINITIONS = [
                     "template_id": {
                         "type": "string",
                         "description": "템플릿 ID (선택사항, 템플릿 메시지 사용 시)"
+                    },
+                    "web_url": {
+                        "type": "string",
+                        "description": "웹 URL 링크 (선택)"
+                    },
+                    "mobile_web_url": {
+                        "type": "string",
+                        "description": "모바일 웹 URL 링크 (선택)"
+                    },
+                    "button_title": {
+                        "type": "string",
+                        "description": "버튼 제목 (선택)"
                     }
                 },
                 "required": ["message"]
@@ -190,6 +198,18 @@ FUNCTION_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "get_kakao_me",
+            "description": "카카오 사용자 정보(내정보) 조회",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "send_kakao_message_to_friends",
             "description": "카카오톡 친구에게 메시지 발송 - 친구 UUID 배열을 받아 여러 친구에게 메시지를 보냅니다",
             "parameters": {
@@ -218,6 +238,75 @@ FUNCTION_DEFINITIONS = [
                     }
                 },
                 "required": ["receiver_uuids", "message"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "tam_admin_action",
+            "description": "tam-admin API 제너릭 액션 프록시(스펙 확정 전)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "description": "수행할 액션명"},
+                    "payload": {"type": "object", "description": "요청 바디(선택)"},
+                    "method": {"type": "string", "description": "HTTP 메소드(기본 POST)"}
+                },
+                "required": ["action"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_devtalk_unanswered_count",
+            "description": "Devtalk 답변 없는 최근 작성글 수 조회",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_devtalk_unanswered_list",
+            "description": "Devtalk 미답변 글 목록 조회",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "post_devtalk_reply",
+            "description": "Devtalk 토픽에 답변 등록",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "topic_id": {"type": "integer", "description": "토픽 ID"},
+                    "raw": {"type": "string", "description": "답변 본문"},
+                    "target_recipients": {"type": "string", "description": "수신 대상 (선택)"},
+                    "archetype": {"type": "string", "description": "유형 (선택)"}
+                },
+                "required": ["topic_id", "raw"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_devtalk_chat_matching_list",
+            "description": "분류별 데브톡 사전 답변 목록 조회",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
             }
         }
     }
@@ -346,15 +435,31 @@ def execute_function(function_name, arguments):
             return json.dumps(result, ensure_ascii=False)
         
         elif function_name == "send_kakao_message":
-            receiver_id = arguments.get("receiver_id") or "self"  # 자기 자신에게 보내기 (기본값)
             message = arguments.get("message")
             template_id = arguments.get("template_id")
+            web_url = arguments.get("web_url")
+            mobile_web_url = arguments.get("mobile_web_url")
+            button_title = arguments.get("button_title")
             
             if not message:
                 return json.dumps({"error": "message는 필수입니다."}, ensure_ascii=False)
             
+            # 로그: 자기 자신(메모) 전송 경로
+            print("[functions] Calling mcp_client.send_kakao_message", {
+                "message": message,
+                "template_id": template_id,
+                "web_url": web_url,
+                "mobile_web_url": mobile_web_url,
+                "button_title": button_title
+            })
             # MCP 서버를 통해 카카오톡 메시지 발송
-            result = mcp_client.send_kakao_message(receiver_id, message, template_id)
+            result = mcp_client.send_kakao_message(
+                message=message,
+                template_id=template_id,
+                web_url=web_url,
+                mobile_web_url=mobile_web_url,
+                button_title=button_title
+            )
             return json.dumps(result, ensure_ascii=False)
         
         elif function_name == "get_famous_saying":
@@ -367,6 +472,10 @@ def execute_function(function_name, arguments):
             limit = arguments.get("limit")
             order = arguments.get("order")
             result = mcp_client.get_kakao_friends(offset=offset, limit=limit, order=order)
+            return json.dumps(result, ensure_ascii=False)
+        
+        elif function_name == "get_kakao_me":
+            result = mcp_client.get_kakao_me()
             return json.dumps(result, ensure_ascii=False)
         
         elif function_name == "send_kakao_message_to_friends":
@@ -382,6 +491,14 @@ def execute_function(function_name, arguments):
             if not message:
                 return json.dumps({"error": "message는 필수입니다."}, ensure_ascii=False)
             
+            # 로그: 친구 전송 경로
+            print("[functions] Calling mcp_client.send_kakao_message_to_friends", {
+                "receiver_uuids": receiver_uuids,
+                "message": message,
+                "web_url": web_url,
+                "mobile_web_url": mobile_web_url,
+                "button_title": button_title
+            })
             # MCP 서버를 통해 친구들에게 카카오톡 메시지 발송
             result = mcp_client.send_kakao_message_to_friends(
                 receiver_uuids=receiver_uuids,
@@ -390,6 +507,35 @@ def execute_function(function_name, arguments):
                 mobile_web_url=mobile_web_url,
                 button_title=button_title
             )
+            return json.dumps(result, ensure_ascii=False)
+        
+        elif function_name == "tam_admin_action":
+            action = arguments.get("action")
+            payload = arguments.get("payload")
+            method = arguments.get("method") or "POST"
+            result = mcp_client.tam_admin_proxy(action=action, payload=payload, method=method)
+            return json.dumps(result, ensure_ascii=False)
+        
+        elif function_name == "get_devtalk_unanswered_count":
+            result = mcp_client.get_devtalk_unanswered_count()
+            return json.dumps(result, ensure_ascii=False)
+        
+        elif function_name == "get_devtalk_unanswered_list":
+            result = mcp_client.get_devtalk_unanswered_list()
+            return json.dumps(result, ensure_ascii=False)
+        
+        elif function_name == "post_devtalk_reply":
+            topic_id = arguments.get("topic_id")
+            raw = arguments.get("raw")
+            target_recipients = arguments.get("target_recipients")
+            archetype = arguments.get("archetype")
+            if not topic_id or not raw:
+                return json.dumps({"error": "topic_id와 raw는 필수입니다."}, ensure_ascii=False)
+            result = mcp_client.post_devtalk_reply(topic_id=topic_id, raw=raw, target_recipients=target_recipients, archetype=archetype)
+            return json.dumps(result, ensure_ascii=False)
+        
+        elif function_name == "get_devtalk_chat_matching_list":
+            result = mcp_client.get_devtalk_chat_matching_list()
             return json.dumps(result, ensure_ascii=False)
         
         else:

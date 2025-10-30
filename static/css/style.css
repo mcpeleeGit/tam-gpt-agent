@@ -114,6 +114,40 @@ body {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
+/* 표 스타일 - 게시물 경계가 명확하도록 라인 표시 */
+.ai-message .message-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+    table-layout: auto;
+}
+
+.ai-message .message-content th,
+.ai-message .message-content td {
+    border: 1px solid #d9d9d9;
+    padding: 8px 10px;
+    vertical-align: top;
+    font-size: 0.95rem;
+}
+
+.ai-message .message-content th {
+    background: #f5f7fa;
+    font-weight: 600;
+}
+
+.ai-message .message-content tr:nth-child(even) td {
+    background: #fcfdff;
+}
+
+.ai-message .message-content a {
+    color: #1976d2;
+    text-decoration: none;
+}
+
+.ai-message .message-content a:hover {
+    text-decoration: underline;
+}
+
 .ai-message .message-content i {
     color: #4facfe;
     margin-right: 8px;

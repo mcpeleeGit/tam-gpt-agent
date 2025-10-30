@@ -4,6 +4,67 @@
 
 MCP 서버는 GPT 에이전트가 외부 서비스(카카오톡 등)와 통신할 수 있도록 하는 프로토콜 서버입니다.
 
+## tam-admin 서버 (신규)
+
+### 설치 및 실행
+
+```bash
+cd mcp_server
+python3 tam_admin_mcp_server.py
+```
+
+기본 포트: `5005`
+
+환경 변수 설정 (`.env`):
+```
+TAM_ADMIN_MCP_SERVER_PORT=5005
+TAM_ADMIN_API_BASE_URL=https://tam-admin.example.com  # (스펙 확정 전, 선택)
+```
+
+### API 엔드포인트
+
+#### 1. 헬스 체크
+```
+GET /mcp/tam-admin/health
+
+Response:
+{
+  "status": "healthy",
+  "service": "tam_admin_mcp_server",
+  "version": "1.0.0"
+}
+```
+
+#### 2. 기능 목록 조회
+```
+GET /mcp/tam-admin/capabilities
+
+Response:
+{
+  "tools": [
+    {
+      "name": "tam_admin_action",
+      "description": "tam-admin API 제너릭 액션 프록시",
+      "parameters": {"action": "string", "payload": "object", "method": "string"}
+    }
+  ]
+}
+```
+
+#### 3. 제너릭 프록시 (스펙 확정 전)
+```
+POST /mcp/tam-admin/proxy
+
+Request Body 예:
+{
+  "action": "get_customer",
+  "payload": { ... },
+  "method": "POST"
+}
+
+Response: 501 Not Implemented (스펙 확정 전)
+```
+
 ## 카카오톡 메시지 발송 서버
 
 ### 설치 및 실행

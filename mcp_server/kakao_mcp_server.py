@@ -28,12 +28,11 @@ class KakaoMessenger:
         self.access_token = access_token or KAKAO_ACCESS_TOKEN
         self.api_endpoint = KAKAO_API_ENDPOINT
     
-    def send_message(self, receiver_id, message, web_url=None, mobile_web_url=None, button_title=None):
+    def send_message(self, message, web_url=None, mobile_web_url=None, button_title=None):
         """
         카카오톡 메시지 발송
         
         Args:
-            receiver_id (str): 수신자 ID 또는 UUID (현재는 미사용, 추후 receiver_uuids 파라미터로 확장 가능)
             message (str): 발송할 메시지 내용 (최대 200자)
             web_url (str, optional): 웹 URL 링크
             mobile_web_url (str, optional): 모바일 웹 URL 링크
@@ -84,6 +83,7 @@ class KakaoMessenger:
         }
         
         try:
+            print("[kakao_mcp_server] Messenger.send_message -> endpoint", self.api_endpoint, "payload:", data)
             # 카카오톡 API 호출
             response = requests.post(
                 self.api_endpoint,
@@ -97,7 +97,6 @@ class KakaoMessenger:
                 result = response.json()
                 return {
                     "success": True,
-                    "receiver_id": receiver_id,
                     "message": message,
                     "sent_at": datetime.now().isoformat(),
                     "status": "sent",
@@ -148,6 +147,32 @@ class KakaoMessenger:
             "sent_at": "2024-10-26T15:00:00Z",
             "status": "sent"
         }
+
+    def get_my_info(self):
+        """카카오 사용자 정보 조회 (내정보)"""
+        if not self.access_token:
+            return {"success": False, "error": "KAKAO_ACCESS_TOKEN이 설정되지 않았습니다."}
+
+        me_url = f"{os.getenv('KAKAO_API_BASE_URL', 'https://kapi.kakao.com')}/v2/user/me"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        try:
+            response = requests.get(me_url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                return {"success": True, "data": response.json()}
+            else:
+                return {
+                    "success": False,
+                    "error": f"카카오톡 API 오류: {response.status_code}",
+                    "error_message": response.text,
+                    "status_code": response.status_code
+                }
+        except requests.exceptions.Timeout:
+            return {"success": False, "error": "카카오톡 API 호출 시간 초과"}
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": f"카카오톡 API 호출 실패: {str(e)}"}
+        except Exception as e:
+            return {"success": False, "error": f"알 수 없는 오류: {str(e)}"}
 
     def get_friends(self, offset=None, limit=None, order=None):
         """카카오톡 친구 목록 조회"""
@@ -254,6 +279,7 @@ class KakaoMessenger:
         }
         
         try:
+            print("[kakao_mcp_server] Messenger.send_message_to_friends -> endpoint", friends_message_url, "payload:", data)
             # 카카오톡 API 호출
             response = requests.post(
                 friends_message_url,
@@ -308,7 +334,6 @@ def send_kakao_message():
     
     Request Body:
     {
-        "receiver_id": "user123",  // optional (현재는 미사용)
         "message": "안녕하세요",
         "web_url": "https://example.com",  // optional
         "mobile_web_url": "https://example.com",  // optional
@@ -317,11 +342,11 @@ def send_kakao_message():
     """
     try:
         data = request.json
+        print("[kakao_mcp_server] /mcp/kakao/send body:", data)
         
         if not data:
             return jsonify({"error": "Request body가 비어있습니다."}), 400
         
-        receiver_id = data.get('receiver_id')
         message = data.get('message')
         web_url = data.get('web_url')
         mobile_web_url = data.get('mobile_web_url')
@@ -335,10 +360,12 @@ def send_kakao_message():
         
         if template_id:
             template_args = data.get('template_args', {})
-            result = messenger.send_template_message(receiver_id, template_id, template_args)
+            # 템플릿 전송은 현재 receiver_id를 사용하지 않습니다
+            print("[kakao_mcp_server] calling messenger.send_template_message (self memo path)")
+            result = messenger.send_template_message(None, template_id, template_args)
         else:
+            print("[kakao_mcp_server] calling messenger.send_message (self memo path)")
             result = messenger.send_message(
-                receiver_id=receiver_id,
                 message=message,
                 web_url=web_url,
                 mobile_web_url=mobile_web_url,
@@ -366,6 +393,7 @@ def send_kakao_message_to_friends():
     """
     try:
         data = request.json
+        print("[kakao_mcp_server] /mcp/kakao/send-to-friends body:", data)
         
         if not data:
             return jsonify({"error": "Request body가 비어있습니다."}), 400
@@ -386,6 +414,7 @@ def send_kakao_message_to_friends():
                 "error": "message는 필수입니다."
             }), 400
         
+        print("[kakao_mcp_server] calling messenger.send_message_to_friends (friends path)")
         result = messenger.send_message_to_friends(
             receiver_uuids=receiver_uuids,
             message=message,
@@ -417,9 +446,11 @@ def get_capabilities():
                 "name": "send_kakao_message",
                 "description": "카카오톡 메시지 발송",
                 "parameters": {
-                    "receiver_id": "string (required) - 수신자 ID",
                     "message": "string (required) - 메시지 내용",
-                    "template_id": "string (optional) - 템플릿 ID"
+                    "template_id": "string (optional) - 템플릿 ID",
+                    "web_url": "string (optional) - 웹 URL",
+                    "mobile_web_url": "string (optional) - 모바일 웹 URL",
+                    "button_title": "string (optional) - 버튼 제목"
                 }
             },
             {
@@ -430,6 +461,11 @@ def get_capabilities():
                     "limit": "number (optional) - 조회 개수",
                     "order": "string (optional) - asc 또는 desc"
                 }
+            },
+            {
+                "name": "get_kakao_me",
+                "description": "카카오 사용자 정보(내정보) 조회",
+                "parameters": {}
             },
             {
                 "name": "send_kakao_message_to_friends",
@@ -454,6 +490,15 @@ def get_kakao_friends():
         order = request.args.get('order', default=None, type=str)
 
         result = messenger.get_friends(offset=offset, limit=limit, order=order)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/mcp/kakao/me', methods=['GET'])
+def get_kakao_me():
+    """MCP 엔드포인트: 카카오 사용자 정보(내정보) 조회"""
+    try:
+        result = messenger.get_my_info()
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
