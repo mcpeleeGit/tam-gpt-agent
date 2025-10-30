@@ -2,7 +2,7 @@
 카카오톡 메시지 발송 MCP 서버
 Model Context Protocol을 통해 GPT 에이전트가 카카오톡 메시지를 발송할 수 있도록 지원
 """
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 import os
 import json
 import requests
@@ -21,12 +21,102 @@ KAKAO_API_BASE_URL = os.getenv('KAKAO_API_BASE_URL', 'https://kapi.kakao.com')
 KAKAO_API_ENDPOINT = f"{KAKAO_API_BASE_URL}/v2/api/talk/memo/default/send"
 KAKAO_ACCESS_TOKEN = os.getenv('KAKAO_ACCESS_TOKEN', '')
 
+# OAuth 설정 및 토큰 저장소
+KAKAO_REST_API_KEY = os.getenv('KAKAO_REST_API_KEY', '')
+# 콜백 미설정 시 기본값(현재 서버 포트 기준)
+DEFAULT_REDIRECT_URI = f"http://127.0.0.1:{int(os.getenv('MCP_SERVER_PORT', 5003))}/mcp/kakao/oauth/callback"
+KAKAO_REDIRECT_URI = os.getenv('KAKAO_REDIRECT_URI', DEFAULT_REDIRECT_URI)
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TOKEN_STORE_PATH = os.path.join(PROJECT_ROOT, 'data', 'kakao_tokens.json')
+
+def load_tokens():
+    try:
+        if os.path.exists(TOKEN_STORE_PATH):
+            with open(TOKEN_STORE_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def save_tokens(tokens):
+    try:
+        os.makedirs(os.path.dirname(TOKEN_STORE_PATH), exist_ok=True)
+        tokens['updated_at'] = datetime.now().isoformat()
+        with open(TOKEN_STORE_PATH, 'w', encoding='utf-8') as f:
+            json.dump(tokens, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+def build_kakao_authorize_url(state=None):
+    params = {
+        'client_id': KAKAO_REST_API_KEY,
+        'redirect_uri': KAKAO_REDIRECT_URI,
+        'response_type': 'code',
+    }
+    if state:
+        params['state'] = state
+    return f"https://kauth.kakao.com/oauth/authorize?{urlencode(params)}"
+
+def exchange_code_for_tokens(code):
+    data = {
+        'grant_type': 'authorization_code',
+        'client_id': KAKAO_REST_API_KEY,
+        'redirect_uri': KAKAO_REDIRECT_URI,
+        'code': code,
+    }
+    resp = requests.post('https://kauth.kakao.com/oauth/token', data=data, timeout=10)
+    if resp.status_code == 200:
+        return resp.json()
+    raise Exception(f"토큰 교환 실패: {resp.status_code} {resp.text}")
+
+def refresh_access_token(refresh_token):
+    data = {
+        'grant_type': 'refresh_token',
+        'client_id': KAKAO_REST_API_KEY,
+        'refresh_token': refresh_token,
+    }
+    resp = requests.post('https://kauth.kakao.com/oauth/token', data=data, timeout=10)
+    if resp.status_code == 200:
+        return resp.json()
+    raise Exception(f"토큰 갱신 실패: {resp.status_code} {resp.text}")
+
 class KakaoMessenger:
     """카카오톡 메시지 발송 클래스"""
     
     def __init__(self, access_token=None):
-        self.access_token = access_token or KAKAO_ACCESS_TOKEN
+        tokens = load_tokens()
+        self.access_token = access_token or tokens.get('access_token') or KAKAO_ACCESS_TOKEN
         self.api_endpoint = KAKAO_API_ENDPOINT
+        self._last_auth_error = None
+
+    def _update_access_token_from_store(self):
+        tokens = load_tokens()
+        new_token = tokens.get('access_token')
+        if new_token:
+            self.access_token = new_token
+
+    def _attempt_refresh_and_update(self):
+        tokens = load_tokens()
+        refresh_token_value = tokens.get('refresh_token')
+        if not (KAKAO_REST_API_KEY and refresh_token_value):
+            return False
+        try:
+            refreshed = refresh_access_token(refresh_token_value)
+            merged = {
+                'access_token': refreshed.get('access_token', tokens.get('access_token')),
+                'refresh_token': refreshed.get('refresh_token', tokens.get('refresh_token')),
+                'token_type': refreshed.get('token_type', tokens.get('token_type')),
+                'expires_in': refreshed.get('expires_in', tokens.get('expires_in')),
+                'scope': refreshed.get('scope', tokens.get('scope')),
+            }
+            if save_tokens(merged):
+                self._update_access_token_from_store()
+                return True
+        except Exception as e:
+            self._last_auth_error = str(e)
+        return False
     
     def send_message(self, message, web_url=None, mobile_web_url=None, button_title=None):
         """
@@ -102,6 +192,32 @@ class KakaoMessenger:
                     "status": "sent",
                     "api_response": result
                 }
+            elif response.status_code == 401:
+                if self._attempt_refresh_and_update():
+                    headers['Authorization'] = f'Bearer {self.access_token}'
+                    retry_resp = requests.post(
+                        self.api_endpoint,
+                        headers=headers,
+                        data=data,
+                        timeout=10
+                    )
+                    if retry_resp.status_code == 200:
+                        result = retry_resp.json()
+                        return {
+                            "success": True,
+                            "message": message,
+                            "sent_at": datetime.now().isoformat(),
+                            "status": "sent",
+                            "api_response": result,
+                            "refreshed": True
+                        }
+                auth_url = build_kakao_authorize_url()
+                return {
+                    "success": False,
+                    "error": "카카오톡 API 오류: 401",
+                    "auth_required": True,
+                    "auth_url": auth_url
+                }
             else:
                 return {
                     "success": False,
@@ -160,6 +276,13 @@ class KakaoMessenger:
             response = requests.get(me_url, headers=headers, timeout=10)
             if response.status_code == 200:
                 return {"success": True, "data": response.json()}
+            elif response.status_code == 401:
+                if self._attempt_refresh_and_update():
+                    headers['Authorization'] = f'Bearer {self.access_token}'
+                    retry_resp = requests.get(me_url, headers=headers, timeout=10)
+                    if retry_resp.status_code == 200:
+                        return {"success": True, "data": retry_resp.json(), "refreshed": True}
+                return {"success": False, "error": "카카오톡 API 오류: 401", "auth_required": True, "auth_url": build_kakao_authorize_url()}
             else:
                 return {
                     "success": False,
@@ -202,6 +325,13 @@ class KakaoMessenger:
                     "success": True,
                     "data": data
                 }
+            elif response.status_code == 401:
+                if self._attempt_refresh_and_update():
+                    headers['Authorization'] = f'Bearer {self.access_token}'
+                    retry_resp = requests.get(friends_url, headers=headers, params=params, timeout=10)
+                    if retry_resp.status_code == 200:
+                        return {"success": True, "data": retry_resp.json(), "refreshed": True}
+                return {"success": False, "error": "카카오톡 API 오류: 401", "auth_required": True, "auth_url": build_kakao_authorize_url()}
             else:
                 return {
                     "success": False,
@@ -299,6 +429,34 @@ class KakaoMessenger:
                     "successful_receiver_uuids": result.get("successful_receiver_uuids", []),
                     "failure_info": result.get("failure_info", []),
                     "api_response": result
+                }
+            elif response.status_code == 401:
+                if self._attempt_refresh_and_update():
+                    headers['Authorization'] = f'Bearer {self.access_token}'
+                    retry_resp = requests.post(
+                        friends_message_url,
+                        headers=headers,
+                        data=data,
+                        timeout=10
+                    )
+                    if retry_resp.status_code == 200:
+                        result = retry_resp.json()
+                        return {
+                            "success": True,
+                            "receiver_uuids": receiver_uuids,
+                            "message": message,
+                            "sent_at": datetime.now().isoformat(),
+                            "successful_receiver_uuids": result.get("successful_receiver_uuids", []),
+                            "failure_info": result.get("failure_info", []),
+                            "api_response": result,
+                            "refreshed": True
+                        }
+                auth_url = build_kakao_authorize_url()
+                return {
+                    "success": False,
+                    "error": "카카오톡 API 오류: 401",
+                    "auth_required": True,
+                    "auth_url": auth_url
                 }
             else:
                 return {
@@ -480,6 +638,54 @@ def get_capabilities():
             }
         ]
     }), 200
+
+@app.route('/mcp/kakao/login', methods=['GET'])
+def kakao_login():
+    """카카오 OAuth 로그인: 브라우저 접근 시 Kakao auth로 리다이렉트, API는 JSON 제공"""
+    if not KAKAO_REST_API_KEY:
+        return jsonify({"success": False, "error": "KAKAO_REST_API_KEY 환경변수가 필요합니다."}), 500
+    auth_url = build_kakao_authorize_url()
+
+    # API 호출 등 JSON 선호 조건: format=json 쿼리 또는 Accept: application/json
+    wants_json = (request.args.get('format') == 'json') or ('application/json' in (request.headers.get('Accept') or ''))
+    if wants_json:
+        return jsonify({"success": True, "auth_url": auth_url, "redirect_uri": KAKAO_REDIRECT_URI})
+
+    # 브라우저 접근 기본: Kakao 인증 페이지로 리다이렉트
+    return redirect(auth_url, code=302)
+
+@app.route('/mcp/kakao/oauth/callback', methods=['GET'])
+def kakao_oauth_callback():
+    """카카오 OAuth 콜백: code로 토큰 교환 후 저장"""
+    try:
+        code = request.args.get('code')
+        if not code:
+            return jsonify({"success": False, "error": "code 파라미터가 없습니다."}), 400
+        token_response = exchange_code_for_tokens(code)
+        existing = load_tokens()
+        tokens_to_save = {
+            'access_token': token_response.get('access_token'),
+            'refresh_token': token_response.get('refresh_token') or existing.get('refresh_token'),
+            'token_type': token_response.get('token_type'),
+            'expires_in': token_response.get('expires_in'),
+            'scope': token_response.get('scope'),
+        }
+        save_tokens(tokens_to_save)
+        messenger._update_access_token_from_store()
+        # 대화로 복귀 (웹채팅 UI)
+        return redirect('http://127.0.0.1:5002/?kakao_auth=ok', code=302)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/mcp/kakao/token-status', methods=['GET'])
+def kakao_token_status():
+    tokens = load_tokens()
+    masked = {
+        'has_access_token': bool(tokens.get('access_token')),
+        'has_refresh_token': bool(tokens.get('refresh_token')),
+        'updated_at': tokens.get('updated_at')
+    }
+    return jsonify({"success": True, "tokens": masked, "redirect_uri": KAKAO_REDIRECT_URI}), 200
 
 @app.route('/mcp/kakao/friends', methods=['GET'])
 def get_kakao_friends():

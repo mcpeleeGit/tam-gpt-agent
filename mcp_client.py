@@ -14,6 +14,8 @@ class MCPClient:
         self.tam_admin_base_url = os.getenv('TAM_ADMIN_MCP_SERVER_URL', 'http://localhost:5005')
         # devtalk MCP 서버 URL
         self.devtalk_base_url = os.getenv('DEVTALK_MCP_SERVER_URL', 'http://localhost:5006')
+        # github MCP 서버 URL
+        self.github_base_url = os.getenv('GITHUB_MCP_SERVER_URL', 'http://localhost:5011')
     
     def send_kakao_message(self, message, template_id=None, web_url=None, mobile_web_url=None, button_title=None):
         """
@@ -128,6 +130,29 @@ class MCPClient:
             return response.json()
         except requests.exceptions.RequestException as e:
             return {"success": False, "error": f"MCP 서버 호출 오류: {str(e)}"}
+        except Exception as e:
+            return {"success": False, "error": f"알 수 없는 오류: {str(e)}"}
+
+    # ===== github MCP 연동 =====
+    def get_github_repos(self, user=None, visibility=None, affiliation=None, per_page=None, page=None):
+        try:
+            url = f"{self.github_base_url}/mcp/github/repos"
+            params = {}
+            if user:
+                params['user'] = user
+            if visibility:
+                params['visibility'] = visibility
+            if affiliation:
+                params['affiliation'] = affiliation
+            if per_page:
+                params['per_page'] = per_page
+            if page:
+                params['page'] = page
+            r = requests.get(url, params=params, timeout=15)
+            r.raise_for_status()
+            return r.json()
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": f"GitHub MCP 서버 호출 오류: {str(e)}"}
         except Exception as e:
             return {"success": False, "error": f"알 수 없는 오류: {str(e)}"}
 

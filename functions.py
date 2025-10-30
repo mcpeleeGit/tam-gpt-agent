@@ -260,6 +260,24 @@ FUNCTION_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "get_github_repos",
+            "description": "GitHub 리포지토리 목록 조회 (인증 사용자 또는 특정 사용자)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user": {"type": "string", "description": "특정 사용자명 (선택)"},
+                    "visibility": {"type": "string", "description": "all|public|private (선택)"},
+                    "affiliation": {"type": "string", "description": "owner,collaborator,organization_member (선택)"},
+                    "per_page": {"type": "integer", "description": "페이지당 개수 (선택)"},
+                    "page": {"type": "integer", "description": "페이지 번호 (선택)"}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_devtalk_unanswered_count",
             "description": "Devtalk 답변 없는 최근 작성글 수 조회",
             "parameters": {
@@ -476,6 +494,15 @@ def execute_function(function_name, arguments):
         
         elif function_name == "get_kakao_me":
             result = mcp_client.get_kakao_me()
+            return json.dumps(result, ensure_ascii=False)
+        
+        elif function_name == "get_github_repos":
+            user = arguments.get("user")
+            visibility = arguments.get("visibility")
+            affiliation = arguments.get("affiliation")
+            per_page = arguments.get("per_page")
+            page = arguments.get("page")
+            result = mcp_client.get_github_repos(user=user, visibility=visibility, affiliation=affiliation, per_page=per_page, page=page)
             return json.dumps(result, ensure_ascii=False)
         
         elif function_name == "send_kakao_message_to_friends":

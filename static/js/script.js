@@ -28,8 +28,24 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
 
             if (response.ok) {
-                // AI 응답 표시
-                addMessageToChat(data.response, 'ai', data.timestamp);
+                // auth_required 자동 처리
+                let authContent = null;
+                if (typeof data.response === 'object' && data.response !== null && data.response.auth_required && data.response.auth_url) {
+                    authContent = `<b>카카오 인증이 필요합니다.</b><br><a href="${data.response.auth_url}" target="_blank" class="kakao-login-btn">카카오 로그인</a>`;
+                } else if (typeof data.response === 'string' && data.response.includes('auth_required')) {
+                    // 혹시라도 문자열에 포함된 경우 (백엔드 구조에 따라)
+                    try {
+                        const jsonInString = JSON.parse(data.response);
+                        if (jsonInString.auth_required && jsonInString.auth_url) {
+                            authContent = `<b>카카오 인증이 필요합니다.</b><br><a href="${jsonInString.auth_url}" target="_blank" class="kakao-login-btn">카카오 로그인</a>`;
+                        }
+                    } catch(e){}
+                }
+                if (authContent) {
+                    addMessageToChat(authContent, 'ai', data.timestamp);
+                } else {
+                    addMessageToChat(data.response, 'ai', data.timestamp);
+                }
             } else {
                 // 에러 메시지 표시
                 addMessageToChat(`오류: ${data.error}`, 'ai');
