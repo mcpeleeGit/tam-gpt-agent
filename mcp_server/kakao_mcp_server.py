@@ -26,6 +26,7 @@ KAKAO_REST_API_KEY = os.getenv('KAKAO_REST_API_KEY', '')
 # 콜백 미설정 시 기본값(현재 서버 포트 기준)
 DEFAULT_REDIRECT_URI = f"http://127.0.0.1:{int(os.getenv('MCP_SERVER_PORT', 5003))}/mcp/kakao/oauth/callback"
 KAKAO_REDIRECT_URI = os.getenv('KAKAO_REDIRECT_URI', DEFAULT_REDIRECT_URI)
+KAKAO_SCOPES = os.getenv('KAKAO_SCOPES', 'talk_calendar')
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOKEN_STORE_PATH = os.path.join(PROJECT_ROOT, 'data', 'kakao_tokens.json')
@@ -54,6 +55,7 @@ def build_kakao_authorize_url(state=None):
         'client_id': KAKAO_REST_API_KEY,
         'redirect_uri': KAKAO_REDIRECT_URI,
         'response_type': 'code',
+        'scope': KAKAO_SCOPES,
     }
     if state:
         params['state'] = state
@@ -216,7 +218,8 @@ class KakaoMessenger:
                     "success": False,
                     "error": "카카오톡 API 오류: 401",
                     "auth_required": True,
-                    "auth_url": auth_url
+                    "auth_url": auth_url,
+                    "provider": "kakao"
                 }
             else:
                 return {
@@ -282,7 +285,7 @@ class KakaoMessenger:
                     retry_resp = requests.get(me_url, headers=headers, timeout=10)
                     if retry_resp.status_code == 200:
                         return {"success": True, "data": retry_resp.json(), "refreshed": True}
-                return {"success": False, "error": "카카오톡 API 오류: 401", "auth_required": True, "auth_url": build_kakao_authorize_url()}
+                return {"success": False, "error": "카카오톡 API 오류: 401", "auth_required": True, "auth_url": build_kakao_authorize_url(), "provider": "kakao"}
             else:
                 return {
                     "success": False,
@@ -331,7 +334,7 @@ class KakaoMessenger:
                     retry_resp = requests.get(friends_url, headers=headers, params=params, timeout=10)
                     if retry_resp.status_code == 200:
                         return {"success": True, "data": retry_resp.json(), "refreshed": True}
-                return {"success": False, "error": "카카오톡 API 오류: 401", "auth_required": True, "auth_url": build_kakao_authorize_url()}
+                return {"success": False, "error": "카카오톡 API 오류: 401", "auth_required": True, "auth_url": build_kakao_authorize_url(), "provider": "kakao"}
             else:
                 return {
                     "success": False,
@@ -456,7 +459,8 @@ class KakaoMessenger:
                     "success": False,
                     "error": "카카오톡 API 오류: 401",
                     "auth_required": True,
-                    "auth_url": auth_url
+                    "auth_url": auth_url,
+                    "provider": "kakao"
                 }
             else:
                 return {

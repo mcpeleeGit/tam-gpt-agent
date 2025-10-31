@@ -278,6 +278,120 @@ FUNCTION_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "create_kakao_calendar",
+            "description": "카카오 캘린더 - 서브 캘린더 생성",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "color": {"type": "string"},
+                    "reminder": {"type": "integer"},
+                    "reminder_all_day": {"type": "integer"}
+                },
+                "required": ["name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_kakao_calendar_event",
+            "description": "카카오 캘린더 - 일정 생성",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "calendar_id": {"type": "string"},
+                    "event": {"type": "object"}
+                },
+                "required": ["calendar_id", "event"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_kakao_calendar_event_simple",
+            "description": "카카오 캘린더 - 간단 일정 생성(로컬시간)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "calendar_id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "start_local": {"type": "string", "description": "YYYY-MM-DD HH:MM (Asia/Seoul)"},
+                    "duration_minutes": {"type": "integer"},
+                    "description": {"type": "string"},
+                    "color": {"type": "string"}
+                },
+                "required": ["calendar_id", "title", "start_local"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_kakao_calendar_holidays",
+            "description": "카카오 캘린더 - 공휴일/기념일 조회",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_from": {"type": "string", "description": "예: 2025-01-01T00:00:00Z"},
+                    "date_to": {"type": "string", "description": "예: 2025-01-31T00:00:00Z"}
+                },
+                "required": ["date_from", "date_to"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_kakao_calendars",
+            "description": "카카오 캘린더 - 사용자/구독 캘린더 목록 조회",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filter": {"type": "string", "description": "USER|SUBSCRIBE|ALL"}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_kakao_calendar_events",
+            "description": "카카오 캘린더 - 일정 목록 조회",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "calendar_id": {"type": "string"},
+                    "date_from": {"type": "string", "description": "ISO8601 UTC e.g. 2025-11-01T00:00:00Z"},
+                    "date_to": {"type": "string", "description": "ISO8601 UTC"},
+                    "limit": {"type": "integer"}
+                },
+                "required": ["calendar_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_kakao_calendar_month_view",
+            "description": "카카오 캘린더 - 월 달력 뷰(휴일+일정 요약 포함)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "calendar_id": {"type": "string"},
+                    "year": {"type": "integer"},
+                    "month": {"type": "integer"},
+                    "limit_per_day": {"type": "integer"}
+                },
+                "required": ["calendar_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_devtalk_unanswered_count",
             "description": "Devtalk 답변 없는 최근 작성글 수 조회",
             "parameters": {
@@ -503,6 +617,64 @@ def execute_function(function_name, arguments):
             per_page = arguments.get("per_page")
             page = arguments.get("page")
             result = mcp_client.get_github_repos(user=user, visibility=visibility, affiliation=affiliation, per_page=per_page, page=page)
+            return json.dumps(result, ensure_ascii=False)
+
+        elif function_name == "create_kakao_calendar":
+            name = arguments.get("name")
+            color = arguments.get("color")
+            reminder = arguments.get("reminder")
+            reminder_all_day = arguments.get("reminder_all_day")
+            result = mcp_client.create_kakao_calendar(name=name, color=color, reminder=reminder, reminder_all_day=reminder_all_day)
+            return json.dumps(result, ensure_ascii=False)
+
+        elif function_name == "create_kakao_calendar_event":
+            calendar_id = arguments.get("calendar_id")
+            event = arguments.get("event")
+            result = mcp_client.create_kakao_calendar_event(calendar_id=calendar_id, event=event)
+            return json.dumps(result, ensure_ascii=False)
+
+        elif function_name == "create_kakao_calendar_event_simple":
+            calendar_id = arguments.get("calendar_id")
+            title = arguments.get("title")
+            start_local = arguments.get("start_local")
+            duration_minutes = arguments.get("duration_minutes")
+            description = arguments.get("description")
+            color = arguments.get("color")
+            result = mcp_client.create_kakao_calendar_event_simple(
+                calendar_id=calendar_id,
+                title=title,
+                start_local=start_local,
+                duration_minutes=duration_minutes or 60,
+                description=description,
+                color=color
+            )
+            return json.dumps(result, ensure_ascii=False)
+
+        elif function_name == "get_kakao_calendar_holidays":
+            date_from = arguments.get("date_from")
+            date_to = arguments.get("date_to")
+            result = mcp_client.get_kakao_calendar_holidays(date_from=date_from, date_to=date_to)
+            return json.dumps(result, ensure_ascii=False)
+
+        elif function_name == "get_kakao_calendars":
+            filter_value = arguments.get("filter")
+            result = mcp_client.get_kakao_calendars(filter_value=filter_value)
+            return json.dumps(result, ensure_ascii=False)
+
+        elif function_name == "get_kakao_calendar_events":
+            calendar_id = arguments.get("calendar_id")
+            date_from = arguments.get("date_from")
+            date_to = arguments.get("date_to")
+            limit = arguments.get("limit")
+            result = mcp_client.get_kakao_calendar_events(calendar_id=calendar_id, date_from=date_from, date_to=date_to, limit=limit)
+            return json.dumps(result, ensure_ascii=False)
+
+        elif function_name == "get_kakao_calendar_month_view":
+            calendar_id = arguments.get("calendar_id")
+            year = arguments.get("year")
+            month = arguments.get("month")
+            limit_per_day = arguments.get("limit_per_day") or 3
+            result = mcp_client.get_kakao_calendar_month_view(calendar_id=calendar_id, year=year, month=month, limit_per_day=limit_per_day)
             return json.dumps(result, ensure_ascii=False)
         
         elif function_name == "send_kakao_message_to_friends":

@@ -1,8 +1,8 @@
 {
-  "access_token": "dIIOM1L3bOGGZWagtSu_jPeVS8ty412SAAAAAQoNGVMAAAGaNa8d9m1lzvpaqIEo",
-  "refresh_token": "FkMJQmCtvT0MOVo2DsJDtI8Zpq0tOjEnAAAAAgoNGVMAAAGaNa8d9G1lzvpaqIEo",
+  "access_token": "NsesaF3K_4iC0FgyFibm-NgRCmg604YlAAAAAQoXC2sAAAGaOXXOxW1lzvpaqIEo",
+  "refresh_token": "tnTT4EtLLo83Wk_F0yG20mQZVFsTj3cWAAAAAgoXC2sAAAGaOXXOvm1lzvpaqIEo",
   "token_type": "bearer",
   "expires_in": 21599,
   "scope": "talk_calendar talk_message talk_calendar_task profile_nickname friends",
-  "updated_at": "2025-10-31T00:14:20.312104"
+  "updated_at": "2025-10-31T17:50:13.299764"
 }

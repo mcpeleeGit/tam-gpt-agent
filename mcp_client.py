@@ -16,6 +16,8 @@ class MCPClient:
         self.devtalk_base_url = os.getenv('DEVTALK_MCP_SERVER_URL', 'http://localhost:5006')
         # github MCP 서버 URL
         self.github_base_url = os.getenv('GITHUB_MCP_SERVER_URL', 'http://localhost:5011')
+        # kakao calendar MCP 서버 URL
+        self.kakao_cal_base_url = os.getenv('KAKAO_CAL_MCP_SERVER_URL', 'http://localhost:5012')
     
     def send_kakao_message(self, message, template_id=None, web_url=None, mobile_web_url=None, button_title=None):
         """
@@ -155,6 +157,190 @@ class MCPClient:
             return {"success": False, "error": f"GitHub MCP 서버 호출 오류: {str(e)}"}
         except Exception as e:
             return {"success": False, "error": f"알 수 없는 오류: {str(e)}"}
+
+    # ===== kakao calendar MCP 연동 =====
+    def create_kakao_calendar(self, name: str, color: str = None, reminder: int = None, reminder_all_day: int = None):
+        try:
+            url = f"{self.kakao_cal_base_url}/mcp/kakao-calendar/create/calendar"
+            body = {"name": name}
+            if color is not None:
+                body["color"] = color
+            if reminder is not None:
+                body["reminder"] = reminder
+            if reminder_all_day is not None:
+                body["reminder_all_day"] = reminder_all_day
+            r = requests.post(url, json=body, timeout=10)
+            r.raise_for_status()
+            return r.json()
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": f"Kakao Calendar MCP 서버 호출 오류: {str(e)}"}
+        except Exception as e:
+            return {"success": False, "error": f"알 수 없는 오류: {str(e)}"}
+
+    def create_kakao_calendar_event(self, calendar_id: str, event: dict):
+        try:
+            url = f"{self.kakao_cal_base_url}/mcp/kakao-calendar/create/event"
+            body = {"calendar_id": calendar_id, "event": event}
+            r = requests.post(url, json=body, timeout=12)
+            r.raise_for_status()
+            return r.json()
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": f"Kakao Calendar MCP 서버 호출 오류: {str(e)}"}
+        except Exception as e:
+            return {"success": False, "error": f"알 수 없는 오류: {str(e)}"}
+
+    def get_kakao_calendar_holidays(self, date_from: str, date_to: str):
+        try:
+            url = f"{self.kakao_cal_base_url}/mcp/kakao-calendar/holidays"
+            params = {"from": date_from, "to": date_to}
+            r = requests.get(url, params=params, timeout=10)
+            r.raise_for_status()
+            return r.json()
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": f"Kakao Calendar MCP 서버 호출 오류: {str(e)}"}
+        except Exception as e:
+            return {"success": False, "error": f"알 수 없는 오류: {str(e)}"}
+
+    def create_kakao_calendar_event_simple(self, calendar_id: str, title: str, start_local: str, duration_minutes: int = 60, description: str = None, color: str = None):
+        try:
+            url = f"{self.kakao_cal_base_url}/mcp/kakao-calendar/create/event-simple"
+            body = {
+                "calendar_id": calendar_id,
+                "title": title,
+                "start_local": start_local,
+                "duration_minutes": duration_minutes
+            }
+            if description:
+                body["description"] = description
+            if color:
+                body["color"] = color
+            r = requests.post(url, json=body, timeout=12)
+            r.raise_for_status()
+            return r.json()
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": f"Kakao Calendar MCP 서버 호출 오류: {str(e)}"}
+        except Exception as e:
+            return {"success": False, "error": f"알 수 없는 오류: {str(e)}"}
+
+    def get_kakao_calendars(self, filter_value: str = None):
+        try:
+            url = f"{self.kakao_cal_base_url}/mcp/kakao-calendar/calendars"
+            params = {}
+            if filter_value:
+                params['filter'] = filter_value
+            r = requests.get(url, params=params, timeout=10)
+            r.raise_for_status()
+            return r.json()
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": f"Kakao Calendar MCP 서버 호출 오류: {str(e)}"}
+        except Exception as e:
+            return {"success": False, "error": f"알 수 없는 오류: {str(e)}"}
+
+    def get_kakao_calendar_events(self, calendar_id: str, date_from: str = None, date_to: str = None, limit: int = None):
+        try:
+            url = f"{self.kakao_cal_base_url}/mcp/kakao-calendar/events"
+            params = {"calendar_id": calendar_id}
+            if date_from:
+                params['from'] = date_from
+            if date_to:
+                params['to'] = date_to
+            if limit:
+                params['limit'] = limit
+            r = requests.get(url, params=params, timeout=12)
+            r.raise_for_status()
+            return r.json()
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": f"Kakao Calendar MCP 서버 호출 오류: {str(e)}"}
+        except Exception as e:
+            return {"success": False, "error": f"알 수 없는 오류: {str(e)}"}
+
+    def get_kakao_calendar_month_view(self, calendar_id: str, year: int = None, month: int = None, limit_per_day: int = 3):
+        try:
+            from datetime import datetime, timedelta, timezone
+            KST = timezone(timedelta(hours=9))
+            now_kst = datetime.now(KST)
+            y = year or now_kst.year
+            m = month or now_kst.month
+            first = datetime(y, m, 1, 0, 0, 0, tzinfo=KST)
+            # next month first
+            if m == 12:
+                next_first = datetime(y+1, 1, 1, 0, 0, 0, tzinfo=KST)
+            else:
+                next_first = datetime(y, m+1, 1, 0, 0, 0, tzinfo=KST)
+            f_utc = first.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+            t_utc = next_first.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+            events_resp = self.get_kakao_calendar_events(calendar_id=calendar_id, date_from=f_utc, date_to=t_utc)
+            holidays_resp = self.get_kakao_calendar_holidays(date_from=f_utc, date_to=t_utc)
+
+            # Build day map
+            days = {}
+            # events
+            if events_resp.get('success') and isinstance(events_resp.get('events'), list):
+                for ev in events_resp['events']:
+                    t = ev.get('time') or {}
+                    start_at = t.get('start_at')
+                    if start_at:
+                        # to KST date
+                        try:
+                            sa = start_at.replace('Z', '+00:00')
+                            dt = datetime.fromisoformat(sa).astimezone(KST)
+                            key = dt.strftime('%Y-%m-%d')
+                            days.setdefault(key, {"events": [], "holidays": []})
+                            days[key]["events"].append({
+                                "title": ev.get('title') or '',
+                                "calendar_id": ev.get('calendar_id'),
+                                "start_at": start_at,
+                                "all_day": t.get('all_day') is True,
+                                "color": ev.get('color')
+                            })
+                        except Exception:
+                            continue
+            # holidays
+            if holidays_resp.get('success') and isinstance(holidays_resp.get('events'), list):
+                for hv in holidays_resp['events']:
+                    t = hv.get('time') or {}
+                    start_at = t.get('start_at')
+                    if start_at:
+                        try:
+                            sa = start_at.replace('Z', '+00:00')
+                            dt = datetime.fromisoformat(sa).astimezone(KST)
+                            key = dt.strftime('%Y-%m-%d')
+                            days.setdefault(key, {"events": [], "holidays": []})
+                            days[key]["holidays"].append(hv.get('title') or '')
+                        except Exception:
+                            continue
+
+            # Build calendar grid (weeks)
+            import calendar as pycal
+            cal = pycal.Calendar(firstweekday=6)  # weeks starting Sunday
+            weeks = []
+            for week in cal.monthdatescalendar(y, m):
+                row = []
+                for d in week:
+                    in_month = (d.month == m)
+                    key = d.strftime('%Y-%m-%d')
+                    cell = {
+                        "date": key,
+                        "day": d.day,
+                        "in_month": in_month,
+                        "holidays": days.get(key, {}).get('holidays', []),
+                        "events": (days.get(key, {}).get('events', [])[:limit_per_day])
+                    }
+                    row.append(cell)
+                weeks.append(row)
+
+            return {
+                "success": True,
+                "calendar_view": {
+                    "year": y,
+                    "month": m,
+                    "weeks": weeks
+                },
+                "range": {"from": f_utc, "to": t_utc}
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     def send_kakao_message_to_friends(self, receiver_uuids, message, web_url=None, mobile_web_url=None, button_title=None):
         """

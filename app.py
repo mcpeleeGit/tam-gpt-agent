@@ -127,14 +127,16 @@ def chat():
         # Kakao 인증 필요 신호를 탐지해 로그인 버튼 노출을 위한 구조화 응답으로 변환
         response_payload = None
         try:
-            # 간단한 휴리스틱: 인증 관련 키워드 탐지
+            # 카카오 인증 필요 신호만 처리 (명시적으로 '카카오'가 포함된 경우에 한정)
             lower_text = (ai_response or '').lower()
-            if ('401' in lower_text and 'kakao' in lower_text) or ('인증' in ai_response and '카카오' in ai_response) or ('로그인' in ai_response and '카카오' in ai_response):
-                kakao_login_url = f"http://127.0.0.1:{int(os.getenv('MCP_SERVER_PORT', 5003))}/mcp/kakao/login"
-                response_payload = {
-                    'auth_required': True,
-                    'auth_url': kakao_login_url
-                }
+            if ('kakao' in lower_text) or ('카카오' in ai_response):
+                if ('401' in lower_text) or ('인증' in ai_response) or ('로그인' in ai_response):
+                    kakao_login_url = f"http://127.0.0.1:{int(os.getenv('MCP_SERVER_PORT', 5003))}/mcp/kakao/login"
+                    response_payload = {
+                        'auth_required': True,
+                        'auth_url': kakao_login_url,
+                        'provider': 'kakao'
+                    }
         except Exception:
             pass
 
